@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#14202b" />
+<title>NX Device Tracker</title>
+<style>
+  :root{
+    --bg:#eef1f4; --surface:#ffffff; --ink:#14202b; --muted:#5b6b7a; --faint:#8493a0;
+    --line:#d8dee4; --line2:#e7ebee;
+    --accent:#1c5fd7; --accent-ink:#ffffff;
+    --pending:#f0a000; --done:#1f9d57; --idle:#9aa7b2;
+    --danger:#d23b3b;
+    --radius:12px; --tap:48px;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:var(--sans); color:var(--ink); background:var(--bg);
+    -webkit-text-size-adjust:100%; overscroll-behavior-y:none;
+  }
+  button{font-family:inherit}
+  .mono{font-family:var(--mono); letter-spacing:.02em}
+
+  /* App shell */
+  #app{max-width:680px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+       background:var(--bg); padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  header.bar{
+    position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;
+    padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;display:flex;align-items:center;gap:10px;
+  }
+  header.bar .proj{flex:1;min-width:0}
+  header.bar .proj .name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.bar .proj .sub{font-size:12px;color:#a9b6c2}
+  header.bar button.switch{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:8px;
+       height:38px;padding:0 12px;font-size:13px;font-weight:600}
+  .net{font-size:11px;display:inline-flex;align-items:center;gap:5px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--done)}
+  .dot.off{background:var(--pending)}
+
+  main{flex:1;padding:14px}
+  h2.view-title{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+      margin:2px 2px 12px;font-weight:700}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+      padding:14px;margin-bottom:10px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1;min-width:0}
+  .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* tappable list item */
+  .item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);
+      border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;margin-bottom:9px;
+      min-height:var(--tap);font-size:15px;color:var(--ink);cursor:pointer}
+  .item:active{background:#f3f6f9}
+  .item .lead{font-weight:600}
+  .item .code{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .item .chev{color:var(--faint);font-size:20px;margin-left:auto}
+  .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .tag.done{background:#e3f5ec;color:var(--done)} .tag.pending{background:#fdf0d6;color:#a9760a}
+  .tag.zone{background:#e9eefb;color:var(--accent)}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;
+      border-radius:10px;height:var(--tap);padding:0 16px;font-size:15px;font-weight:600}
+  .btn.primary{background:var(--accent);color:var(--accent-ink);width:100%}
+  .btn.ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+  .btn.sm{height:38px;font-size:13px;padding:0 12px}
+  .btn.block{width:100%}
+  .btn.danger{background:#fdeaea;color:var(--danger)}
+  .btn:disabled{opacity:.5}
+
+  .empty{text-align:center;color:var(--muted);padding:34px 16px}
+  .empty .big{font-size:15px;color:var(--ink);font-weight:600;margin-bottom:4px}
+
+  label.fld{display:block;margin-bottom:14px}
+  label.fld .lab{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;
+      text-transform:uppercase;letter-spacing:.05em}
+  input,select,textarea{width:100%;font-family:inherit;font-size:16px;color:var(--ink);
+      border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+  input.code-in{font-family:var(--mono);text-transform:uppercase}
+  .scanrow{display:flex;gap:8px} .scanrow input{flex:1}
+
+  /* selector dropdown */
+  .linkbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .linkbar select{flex:1}
+
+  /* bottom tabs */
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--surface);
+      border-top:1px solid var(--line);display:flex;
+      padding-bottom:env(safe-area-inset-bottom);max-width:680px;margin:0 auto}
+  nav.tabs button{flex:1;background:none;border:0;cursor:pointer;height:64px;color:var(--faint);
+      font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+  nav.tabs button .ic{font-size:20px;line-height:1}
+  nav.tabs button.on{color:var(--accent)}
+
+  /* modal / sheet */
+  .scrim{position:fixed;inset:0;background:rgba(10,18,26,.5);z-index:50;display:flex;align-items:flex-end;
+      justify-content:center}
+  .sheet{background:var(--surface);width:100%;max-width:680px;border-radius:18px 18px 0 0;
+      padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+  .sheet h3{margin:0 0 16px;font-size:18px}
+  .sheet .actions{display:flex;gap:10px;margin-top:6px}
+  .sheet .actions .btn{flex:1}
+
+  /* scanner */
+  #scanwrap{position:fixed;inset:0;background:#000;z-index:60;display:none;flex-direction:column}
+  #scanwrap video{flex:1;width:100%;object-fit:cover;background:#000}
+  #scanwrap .reticle{position:absolute;top:0;left:0;right:0;bottom:120px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #scanwrap .box{width:64vw;max-width:300px;aspect-ratio:1;border:3px solid rgba(255,255,255,.9);border-radius:16px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35)}
+  #scanwrap .scanbtns{position:absolute;bottom:0;left:0;right:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));display:flex;gap:10px}
+  #scanwrap .scanbtns .btn{flex:1}
+  #scanhint{position:absolute;top:calc(env(safe-area-inset-top) + 16px);left:0;right:0;text-align:center;color:#fff;font-size:13px;text-shadow:0 1px 3px #000;padding:0 20px}
+
+  /* dashboard */
+  .stat{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .stat .num{font-family:var(--mono);font-weight:700;font-size:15px;min-width:74px}
+  .meter{flex:1;height:10px;background:var(--line2);border-radius:999px;overflow:hidden}
+  .meter > i{display:block;height:100%;background:var(--done);border-radius:999px}
+  .meter > i.part{background:var(--pending)}
+  .pathline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+  .pathline .seg{background:#eef2f7;border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+  .pathline .seg b{font-family:var(--mono)}
+  .pathline .arr{color:var(--faint)}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:var(--ink);color:#fff;
+      padding:11px 16px;border-radius:10px;font-size:14px;z-index:80;max-width:90%;text-align:center;
+      opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+
+  /* setup overlay */
+  #setup{position:fixed;inset:0;background:#0f1722;color:#dbe4ec;z-index:90;padding:24px;overflow:auto;
+      font-size:14px;line-height:1.55;display:none}
+  #setup code{background:#1d2a38;padding:2px 6px;border-radius:5px;font-family:var(--mono)}
+  #setup h1{font-size:18px}
+  .muted{color:var(--muted)}
+  .hr{height:1px;background:var(--line);margin:14px 0}
+  .help{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="bar">
+    <div class="proj" id="projHead">
+      <div class="name" id="projName">No project</div>
+      <div class="sub"><span class="net" id="netState"><span class="dot" id="netDot"></span><span id="netTxt">connecting…</span></span></div>
+    </div>
+    <button class="switch" id="btnProjects">Projects</button>
+  </header>
+  <main id="main"></main>
+  <nav class="tabs" id="tabs">
+    <button data-view="rooms" class="on"><span class="ic">▦</span>Rooms</button>
+    <button data-view="lookup"><span class="ic">⌕</span>Lookup</button>
+    <button data-view="network"><span class="ic">⑂</span>Network</button>
+    <button data-view="status"><span class="ic">▤</span>Status</button>
+    <button data-view="more"><span class="ic">⋯</span>More</button>
+  </nav>
+</div>
+
+<!-- Scanner -->
+<div id="scanwrap">
+  <video id="scanvid" playsinline muted></video>
+  <div class="reticle"><div class="box"></div></div>
+  <div id="scanhint">Point at the barcode or Data Matrix code</div>
+  <div class="scanbtns">
+    <button class="btn ghost" id="scanTorch" style="display:none">Light</button>
+    <button class="btn ghost" id="scanManual">Type it</button>
+    <button class="btn primary" id="scanClose">Cancel</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- Setup instructions overlay (shown if Firebase config not filled in) -->
+<div id="setup">
+  <h1>One step before this runs</h1>
+  <p>Paste your Firebase web config into <code>index.html</code> (the <code>FIREBASE_CONFIG</code> object near the bottom), then reload. Full setup steps are in the README. The placeholder values are still in place.</p>
+</div>
+
+<script type="module">
+/* ============================================================
+   NX DEVICE TRACKER  —  single-file demo
+   Edit FIREBASE_CONFIG at the bottom of this file.
+   ============================================================ */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where,
+  serverTimestamp, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ---- config (filled in at the very bottom) ---- */
+const FIREBASE_CONFIG = window.__NX_FIREBASE_CONFIG__;
+
+const PLACEHOLDER = !FIREBASE_CONFIG || /YOUR_/.test(JSON.stringify(FIREBASE_CONFIG));
+if (PLACEHOLDER) { document.getElementById("setup").style.display = "block"; }
+
+/* ---- constants ---- */
+const DEVICE_TYPES = [
+  "Room controller / relay",
+  "Occupancy sensor",
+  "Daylight / photo sensor",
+  "Wall switch / station",
+  "Dimming module (0-10V)",
+  "Power pack",
+  "Other"
+];
+const COUNTABLE = ["Bridge", ...DEVICE_TYPES.filter(t=>t!=="Other")];
+
+/* ---- tiny helpers ---- */
+const $ = (s,r=document)=>r.querySelector(s);
+const el = (tag,props={},...kids)=>{
+  const n=document.createElement(tag);
+  for(const k in props){
+    if(k==="class") n.className=props[k];
+    else if(k==="html") n.innerHTML=props[k];
+    else if(k.startsWith("on")) n.addEventListener(k.slice(2),props[k]);
+    else if(props[k]!=null) n.setAttribute(k,props[k]);
+  }
+  for(const c of kids.flat()){ if(c==null) continue; n.append(c.nodeType?c:document.createTextNode(c)); }
+  return n;
+};
+let toastT;
+function toast(msg){
+  const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2200);
+}
+// Software displays the leading 8-char code. Normalize a raw scan toward that.
+function normalizeCode(raw){
+  const a=(raw||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  return a.length>8 ? a.slice(0,8) : a;
+}
+
+/* ---- state ---- */
+const state = {
+  uid:null, projectId:null,
+  projects:[], controllers:[], links:[], bridges:[], devices:[],
+  view:"rooms", activeLinkId:null, activeBridgeId:null
+};
+let projectUnsubs=[];
+
+/* ---- firebase init ---- */
+let db,auth;
+if(!PLACEHOLDER){
+  const appFb = initializeApp(FIREBASE_CONFIG);
+  db = initializeFirestore(appFb,{
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+  auth = getAuth(appFb);
+  signInAnonymously(auth).catch(e=>toast("Sign-in failed: "+e.code));
+  onAuthStateChanged(auth, u=>{
+    if(u){ state.uid=u.uid; startProjectsListener();
+      const saved=localStorage.getItem("nx.project"); if(saved) selectProject(saved); render(); }
+  });
+  // connectivity hint
+  const setNet=()=>{ const on=navigator.onLine;
+    $("#netDot").className="dot"+(on?"":" off"); $("#netTxt").textContent=on?"online · synced":"offline · saved locally"; };
+  addEventListener("online",setNet); addEventListener("offline",setNet); setNet();
+}
+
+/* ---- firestore data layer ---- */
+const col = (name)=>collection(db,name);
+function startProjectsListener(){
+  onSnapshot(col("projects"), snap=>{
+    state.projects = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    if(state.projectId && !state.projects.find(p=>p.id===state.projectId)) selectProject(null);
+    render();
+  });
+}
+function selectProject(pid){
+  projectUnsubs.forEach(u=>u()); projectUnsubs=[];
+  state.projectId=pid; state.activeLinkId=null; state.activeBridgeId=null;
+  state.controllers=[];state.links=[];state.bridges=[];state.devices=[];
+  if(pid) localStorage.setItem("nx.project",pid); else localStorage.removeItem("nx.project");
+  if(!pid){ render(); return; }
+  const watch=(name,key,sortFn)=>{
+    const q=query(col(name),where("projectId","==",pid));
+    projectUnsubs.push(onSnapshot(q,snap=>{
+      let arr=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(sortFn) arr.sort(sortFn);
+      state[key]=arr; render();
+    }));
+  };
+  watch("controllers","controllers",(a,b)=>(a.smaIndex||0)-(b.smaIndex||0));
+  watch("links","links",(a,b)=>(a.displayId||"").localeCompare(b.displayId||"",undefined,{numeric:true}));
+  watch("bridges","bridges",(a,b)=>(a.roomName||"").localeCompare(b.roomName||""));
+  watch("devices","devices",(a,b)=>(a.createdMs||0)-(b.createdMs||0));
+  render();
+}
+async function add(name,data){ return addDoc(col(name),{...data,projectId:state.projectId,createdMs:Date.now(),createdAt:serverTimestamp()}); }
+async function patch(name,id,data){ return updateDoc(doc(db,name,id),data); }
+async function remove(name,id){ return deleteDoc(doc(db,name,id)); }
+
+/* ---- derived ---- */
+const curProject = ()=>state.projects.find(p=>p.id===state.projectId);
+const linksForView = ()=>state.links;
+const bridgesOnLink = (lid)=>state.bridges.filter(b=>b.linkId===lid);
+const devicesForBridge = (bid)=>state.devices.filter(d=>d.bridgeId===bid);
+function linkLabel(l){
+  const c=state.controllers.find(c=>c.id===l.controllerId);
+  return (l.displayId||"?") + (c? " · "+c.label : "");
+}
+
+/* ============================================================
+   SCANNER
+   ============================================================ */
+let scanStop=null;
+function openScanner(onCode){
+  const wrap=$("#scanwrap"), vid=$("#scanvid");
+  wrap.style.display="flex";
+  let active=true, stream=null, zxingReader=null, rafId=null;
+  const finish=(code)=>{ if(!active) return; active=false; closeScanner(); if(code) onCode(code); };
+  closeScanner = ()=>{
+    active=false; wrap.style.display="none";
+    if(rafId) cancelAnimationFrame(rafId);
+    if(zxingReader){ try{zxingReader.reset();}catch(e){} zxingReader=null; }
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  };
+  $("#scanClose").onclick=()=>{ active=false; closeScanner(); };
+  $("#scanManual").onclick=()=>{ active=false; closeScanner();
+    promptCode(onCode); };
+
+  (async ()=>{
+    try{
+      if("BarcodeDetector" in window){
+        let formats=["data_matrix","code_128","qr_code","code_39","code_93","ean_13"];
+        try{ const sup=await BarcodeDetector.getSupportedFormats();
+          formats=formats.filter(f=>sup.includes(f)); }catch(e){}
+        const detector=new BarcodeDetector(formats.length?{formats}:undefined);
+        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+        vid.srcObject=stream; await vid.play();
+        setupTorch(stream);
+        const tick=async ()=>{
+          if(!active) return;
+          try{ const codes=await detector.detect(vid);
+            if(codes && codes.length){ finish(codes[0].rawValue); return; } }catch(e){}
+          rafId=requestAnimationFrame(tick);
+        };
+        rafId=requestAnimationFrame(tick);
+      } else {
+        // Fallback: ZXing owns the camera
+        $("#scanhint").textContent="Loading scanner…";
+        const z=await import("https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/+esm");
+        const hints=new Map();
+        hints.set(z.DecodeHintType.POSSIBLE_FORMATS,
+          [z.BarcodeFormat.DATA_MATRIX,z.BarcodeFormat.CODE_128,z.BarcodeFormat.QR_CODE,z.BarcodeFormat.CODE_39]);
+        zxingReader=new z.BrowserMultiFormatReader(hints);
+        $("#scanhint").textContent="Point at the barcode or Data Matrix code";
+        zxingReader.decodeFromVideoDevice(null,vid,(res,err)=>{
+          if(res && active) finish(res.getText());
+        });
+      }
+    }catch(e){
+      closeScanner();
+      toast("Camera unavailable — type the code");
+      promptCode(onCode);
+    }
+  })();
+}
+let closeScanner=()=>{};
+function setupTorch(stream){
+  const btn=$("#scanTorch"); const track=stream.getVideoTracks()[0];
+  const caps=track.getCapabilities? track.getCapabilities():{};
+  if(caps && caps.torch){
+    btn.style.display="inline-flex"; let on=false;
+    btn.onclick=async()=>{ on=!on; try{ await track.applyConstraints({advanced:[{torch:on}]}); }catch(e){} };
+  } else { btn.style.display="none"; }
+}
+function promptCode(onCode){
+  const v=window.prompt("Enter the 8-character code shown on the label:");
+  if(v){ const c=normalizeCode(v); if(c) onCode(c); }
+}
+
+/* ============================================================
+   GENERIC FORM SHEET
+   fields: {key,label,type,options,required,placeholder,value}
+   type: text | number | select | textarea | scan
+   ============================================================ */
+function openForm({title, fields, submitLabel="Save", initial={}, onSubmit, extra}){
+  const scrim=el("div",{class:"scrim"});
+  const inputs={}; const raws={};
+  const body=el("div",{class:"sheet"}, el("h3",{},title));
+  for(const f of fields){
+    const id="f_"+f.key;
+    let input;
+    if(f.type==="select"){
+      input=el("select",{id});
+      for(const o of (f.options||[])){
+        const opt=el("option",{value:String(o.value)}, o.label);
+        if(String(initial[f.key]??f.value??"")===String(o.value)) opt.selected=true;
+        input.append(opt);
+      }
+    } else if(f.type==="textarea"){
+      input=el("textarea",{id,rows:"2",placeholder:f.placeholder||""}); input.value=initial[f.key]??f.value??"";
+    } else {
+      input=el("input",{id,type:f.type==="number"?"number":"text",placeholder:f.placeholder||"",
+        inputmode:f.type==="number"?"numeric":undefined});
+      if(f.key==="code"||/code/i.test(f.key)) input.classList.add("code-in");
+      input.value=initial[f.key]??f.value??"";
+    }
+    inputs[f.key]=input;
+    let control=input;
+    if(f.type==="scan"){
+      const scanBtn=el("button",{class:"btn ghost sm",type:"button",
+        onclick:()=>openScanner(code=>{ input.value=normalizeCode(code); raws[f.key]=code; toast("Scanned "+input.value); })},"Scan");
+      control=el("div",{class:"scanrow"}, input, scanBtn);
+    }
+    body.append(el("label",{class:"fld"}, el("span",{class:"lab"},f.label), control),
+      f.help? el("div",{class:"help"},f.help): null);
+  }
+  if(extra) body.append(extra);
+  const submit=el("button",{class:"btn primary",onclick:async()=>{
+    const out={};
+    for(const f of fields){
+      let v=inputs[f.key].value.trim();
+      if(/code/i.test(f.key)) v=normalizeCode(v);
+      if(f.required && !v){ toast(f.label+" is required"); inputs[f.key].focus(); return; }
+      out[f.key]=v; if(raws[f.key]) out[f.key+"Raw"]=raws[f.key];
+    }
+    submit.disabled=true;
+    try{ await onSubmit(out); scrim.remove(); }
+    catch(e){ submit.disabled=false; toast("Couldn't save: "+(e.code||e.message)); }
+  }}, submitLabel);
+  const cancel=el("button",{class:"btn ghost",onclick:()=>scrim.remove()},"Cancel");
+  body.append(el("div",{class:"actions"}, cancel, submit));
+  scrim.append(body);
+  scrim.addEventListener("click",e=>{ if(e.target===scrim) scrim.remove(); });
+  document.body.append(scrim);
+  const first=body.querySelector("input,select,textarea"); if(first && !first.classList.contains("code-in")) first.focus();
+}
+function confirmSheet(msg,onYes,yesLabel="Delete"){
+  const scrim=el("div",{class:"scrim"});
+  const body=el("div",{class:"sheet"},
+    el("h3",{},"Confirm"), el("p",{class:"muted"},msg),
+    el("div",{class:"actions"},
+      el("button",{class:"btn ghost",onclick:()=>scrim.remove()},"Cancel"),
+      el("button",{class:"btn danger",onclick:async()=>{ await onYes(); scrim.remove(); }},yesLabel)));
+  scrim.append(body); document.body.append(scrim);
+}
+
+/* ============================================================
+   VIEWS
+   ============================================================ */
+function render(){
+  if(PLACEHOLDER) return;
+  document.querySelectorAll("nav.tabs button").forEach(b=>
+    b.classList.toggle("on", b.dataset.view===state.view));
+  const p=curProject();
+  $("#projName").textContent = p? p.name : "No project";
+  const m=$("#main"); m.innerHTML="";
+  if(!p){ m.append(viewNoProject()); return; }
+  if(state.view==="rooms")   m.append(state.activeBridgeId? viewBridge() : viewRooms());
+  else if(state.view==="lookup")  m.append(viewLookup());
+  else if(state.view==="network") m.append(viewNetwork());
+  else if(state.view==="status")  m.append(viewStatus());
+  else if(state.view==="more")    m.append(viewMore());
+}
+
+function viewNoProject(){
+  return el("div",{},
+    el("div",{class:"empty"},
+      el("div",{class:"big"},"No project selected"),
+      el("div",{class:"muted"},"Create a project to start scanning devices into it."),
+      el("div",{style:"height:16px"}),
+      el("button",{class:"btn primary",onclick:newProject},"New project")));
+}
+
+/* ---- ROOMS (main capture) ---- */
+function viewRooms(){
+  const wrap=el("div",{});
+  wrap.append(el("h2",{class:"view-title"},"Rooms / Bridges"));
+  const links=linksForView();
+  if(links.length===0){
+    wrap.append(el("div",{class:"card"},
+      el("div",{class:"muted",style:"margin-bottom:10px"},
+        "Add at least one Site Manager or SMA and a link under the Network tab first — every bridge lives on a link."),
+      el("button",{class:"btn ghost block",onclick:()=>{state.view="network";render();}},"Go to Network")));
+    return wrap;
+  }
+  if(!state.activeLinkId || !links.find(l=>l.id===state.activeLinkId)) state.activeLinkId=links[0].id;
+  const sel=el("select",{onchange:e=>{state.activeLinkId=e.target.value;render();}});
+  for(const l of links){ const o=el("option",{value:l.id},"Link "+linkLabel(l));
+    if(l.id===state.activeLinkId) o.selected=true; sel.append(o); }
+  wrap.append(el("div",{class:"linkbar"}, el("span",{class:"muted",style:"font-size:13px"},"Viewing"), sel));
+
+  const rooms=bridgesOnLink(state.activeLinkId);
+  if(rooms.length===0){
+    wrap.append(el("div",{class:"empty"},
+      el("div",{class:"big"},"No bridges on this link yet"),
+      el("div",{class:"muted"},"Scan a bridge to add the first room.")));
+  } else {
+    for(const b of rooms){
+      const n=devicesForBridge(b.id).length;
+      wrap.append(el("button",{class:"item",onclick:()=>{state.activeBridgeId=b.id;render();}},
+        el("div",{class:"grow"},
+          el("div",{class:"lead ell"},b.roomName||"(unnamed room)"),
+          el("div",{class:"code"},"Bridge "+b.code)),
+        el("span",{class:"tag "+(n>0?"done":"pending")}, n>0? n+" dev" : "no dev"),
+        el("span",{class:"chev"},"›")));
+    }
+  }
+  wrap.append(el("div",{style:"height:6px"}),
+    el("button",{class:"btn primary",onclick:()=>addBridge(state.activeLinkId)},"＋  Scan a bridge / add room"));
+  return wrap;
+}
+
+/* ---- BRIDGE DETAIL ---- */
+function viewBridge(){
+  const b=state.bridges.find(x=>x.id===state.activeBridgeId);
+  if(!b){ state.activeBridgeId=null; return viewRooms(); }
+  const link=state.links.find(l=>l.id===b.linkId);
+  const wrap=el("div",{});
+  wrap.append(el("button",{class:"btn ghost sm",style:"margin-bottom:12px",
+    onclick:()=>{state.activeBridgeId=null;render();}},"‹ Back to rooms"));
+  wrap.append(el("div",{class:"card"},
+    el("div",{class:"row"},
+      el("div",{class:"grow"},
+        el("div",{style:"font-weight:700;font-size:18px"},b.roomName||"(unnamed room)"),
+        el("div",{class:"code",style:"color:var(--muted);margin-top:3px"},
+          "Bridge "+b.code+(link?"  ·  Link "+linkLabel(link):""))),
+      el("button",{class:"btn ghost sm",onclick:()=>editBridge(b)},"Edit"))));
+  wrap.append(el("h2",{class:"view-title"},"Devices in this room"));
+  const ds=devicesForBridge(b.id);
+  if(ds.length===0){
+    wrap.append(el("div",{class:"empty"}, el("div",{class:"muted"},"No devices scanned yet.")));
+  } else {
+    for(const d of ds){
+      wrap.append(el("div",{class:"item"},
+        el("div",{class:"grow"},
+          el("div",{class:"lead ell"},d.type),
+          el("div",{class:"code"},d.code)),
+        d.zone? el("span",{class:"tag zone"},"Zone "+d.zone):null,
+        el("button",{class:"btn ghost sm",onclick:()=>confirmSheet(
+          "Remove this "+d.type+" ("+d.code+")?",()=>remove("devices",d.id))},"✕")));
+    }
+  }
+  wrap.append(el("div",{style:"height:6px"}),
+    el("button",{class:"btn primary",onclick:()=>addDevice(b.id)},"＋  Scan a device"));
+  return wrap;
+}
+
+/* ---- LOOKUP (the core feature) ---- */
+let lookupQuery="";
+function viewLookup(){
+  const wrap=el("div",{});
+  wrap.append(el("h2",{class:"view-title"},"Find a device by code"));
+  const input=el("input",{class:"code-in",placeholder:"e.g. 01043CBA",value:lookupQuery,
+    oninput:e=>{lookupQuery=e.target.value; renderLookupResults(results);}});
+  const scanBtn=el("button",{class:"btn ghost sm",onclick:()=>openScanner(c=>{lookupQuery=normalizeCode(c);
+    input.value=lookupQuery; renderLookupResults(results);})},"Scan");
+  wrap.append(el("div",{class:"card"},
+    el("div",{class:"scanrow"}, input, scanBtn),
+    el("div",{class:"help",style:"margin-top:8px;margin-bottom:0"},
+      "Searches every bridge and device code in this project.")));
+  const results=el("div",{});
+  wrap.append(results);
+  renderLookupResults(results);
+  return wrap;
+}
+function renderLookupResults(container){
+  if(!container) return;
+  container.innerHTML="";
+  const q=normalizeCode(lookupQuery);
+  if(!q){ return; }
+  const hits=[];
+  for(const b of state.bridges) if((b.code||"").includes(q))
+    hits.push({kind:"Bridge",code:b.code,bridge:b});
+  for(const d of state.devices) if((d.code||"").includes(q)){
+    const b=state.bridges.find(x=>x.id===d.bridgeId);
+    hits.push({kind:d.type,code:d.code,device:d,bridge:b});
+  }
+  if(hits.length===0){
+    container.append(el("div",{class:"empty"},
+      el("div",{class:"muted"},"No match in this project for "), el("div",{class:"mono"},q)));
+    return;
+  }
+  for(const h of hits){
+    const b=h.bridge;
+    const link=b? state.links.find(l=>l.id===b.linkId):null;
+    const ctrl=link? state.controllers.find(c=>c.id===link.controllerId):null;
+    const path=el("div",{class:"pathline"});
+    const seg=(t,code)=>el("span",{class:"seg"}, code? [t+" ", el("b",{},code)] : t);
+    if(ctrl){ path.append(seg(ctrl.kind==="SM"?"Site Mgr":"SMA",ctrl.label)); path.append(el("span",{class:"arr"},"›")); }
+    if(link){ path.append(seg("Link",link.displayId)); path.append(el("span",{class:"arr"},"›")); }
+    if(b){ path.append(seg(b.roomName||"room")); }
+    container.append(el("div",{class:"card"},
+      el("div",{class:"row",style:"margin-bottom:10px"},
+        el("div",{class:"grow"},
+          el("div",{style:"font-weight:700"},h.kind),
+          el("div",{class:"code",style:"color:var(--muted)"},h.code)),
+        h.device&&h.device.zone? el("span",{class:"tag zone"},"Zone "+h.device.zone):null),
+      path,
+      el("div",{style:"height:10px"}),
+      b? el("button",{class:"btn ghost block",onclick:()=>{
+          state.view="rooms"; state.activeLinkId=b.linkId; state.activeBridgeId=b.id; render(); }},
+          "Open this room") : null));
+  }
+}
+
+/* ---- NETWORK (controllers + links) ---- */
+function viewNetwork(){
+  const wrap=el("div",{});
+  wrap.append(el("h2",{class:"view-title"},"Site Managers & SMAs"));
+  if(state.controllers.length===0){
+    wrap.append(el("div",{class:"empty"}, el("div",{class:"muted"},"No controllers yet.")));
+  }
+  for(const c of state.controllers){
+    const lcount=state.links.filter(l=>l.controllerId===c.id).length;
+    const meta=[c.ip,c.mac,c.location].filter(Boolean).join(" · ");
+    wrap.append(el("div",{class:"card"},
+      el("div",{class:"row"},
+        el("div",{class:"grow"},
+          el("div",{style:"font-weight:700"}, (c.kind==="SM"?"Site Manager":"SMA "+ (c.smaIndex||""))+" — "+c.label),
+          el("div",{class:"code",style:"color:var(--muted);margin-top:2px"}, meta||"no network info"),
+          c.bacnet? el("div",{class:"help",style:"margin:4px 0 0"},"BACnet: "+c.bacnet):null,
+          el("div",{class:"help",style:"margin:4px 0 0"}, lcount+" link"+(lcount===1?"":"s"))),
+        el("button",{class:"btn ghost sm",onclick:()=>editController(c)},"Edit"))));
+  }
+  wrap.append(el("button",{class:"btn ghost block",style:"margin-bottom:18px",onclick:()=>editController(null)},
+    "＋  Add Site Manager / SMA"));
+
+  wrap.append(el("h2",{class:"view-title"},"Links"));
+  if(state.links.length===0){
+    wrap.append(el("div",{class:"empty"}, el("div",{class:"muted"},"No links yet.")));
+  }
+  for(const l of state.links){
+    const n=bridgesOnLink(l.id).length;
+    wrap.append(el("div",{class:"item"},
+      el("div",{class:"grow"},
+        el("div",{class:"lead"},"Link "+l.displayId),
+        el("div",{class:"code"},linkLabel(l))),
+      el("span",{class:"tag "+(n>0?"done":"pending")}, n+" bridge"+(n===1?"":"s")),
+      el("button",{class:"btn ghost sm",onclick:()=>confirmSheet(
+        "Delete Link "+l.displayId+"? Bridges on it will be left unlinked.",()=>remove("links",l.id))},"✕")));
+  }
+  wrap.append(el("button",{class:"btn ghost block",onclick:addLink,
+    disabled: state.controllers.length===0? "":null},"＋  Add link"));
+  return wrap;
+}
+
+/* ---- STATUS (dashboard) ---- */
+function viewStatus(){
+  const wrap=el("div",{});
+  const p=curProject();
+  const expected=(p&&p.expected)||{};
+  wrap.append(el("h2",{class:"view-title"},"Install progress"));
+
+  const counts={Bridge:state.bridges.length};
+  for(const t of DEVICE_TYPES) counts[t]=0;
+  for(const d of state.devices) if(counts[d.type]!=null) counts[d.type]++;
+
+  const card=el("div",{class:"card"});
+  for(const key of COUNTABLE){
+    const have=counts[key]||0; const exp=Number(expected[key]||0);
+    const pct = exp>0? Math.min(100,Math.round(have/exp*100)) : 0;
+    const full = exp>0 && have>=exp;
+    card.append(el("div",{class:"stat"},
+      el("div",{class:"num"}, exp>0? have+"/"+exp : String(have)),
+      el("div",{class:"grow"},
+        el("div",{style:"font-size:13px;margin-bottom:5px"},key),
+        exp>0? el("div",{class:"meter"}, el("i",{class:full?"":"part",style:"width:"+pct+"%"})) : null)));
+  }
+  wrap.append(card);
+  wrap.append(el("button",{class:"btn ghost block",onclick:editExpected},
+    Object.keys(expected).length? "Edit expected totals" : "Set expected totals (for % complete)"));
+  wrap.append(el("div",{class:"help",style:"margin-top:10px"},
+    "Counts are live. Set expected totals to turn them into percentages — leave them blank to just track raw counts."));
+  return wrap;
+}
+
+/* ---- MORE ---- */
+function viewMore(){
+  const p=curProject();
+  const wrap=el("div",{});
+  wrap.append(el("h2",{class:"view-title"},"Project settings"));
+  wrap.append(el("div",{class:"card"},
+    el("div",{style:"font-weight:700;margin-bottom:6px"},p.name),
+    el("div",{class:"muted",style:"font-size:14px"}, p.address||"No address"),
+    el("div",{class:"muted",style:"font-size:14px;margin-top:4px"},
+      [p.contactName,p.contactCompany].filter(Boolean).join(", ")||"No contact"),
+    el("div",{class:"muted",style:"font-size:14px"},[p.contactPhone,p.contactEmail].filter(Boolean).join(" · ")),
+    el("div",{style:"height:12px"}),
+    el("button",{class:"btn ghost block",onclick:()=>editProject(p)},"Edit project details")));
+
+  wrap.append(el("h2",{class:"view-title"},"Data"));
+  wrap.append(el("button",{class:"btn ghost block",style:"margin-bottom:10px",onclick:exportCsv},
+    "⭳  Export everything to CSV"));
+  wrap.append(el("button",{class:"btn ghost block",onclick:()=>openScanner(c=>toast("Scanner read: "+c))},
+    "Test the scanner"));
+
+  wrap.append(el("h2",{class:"view-title"},"Project"));
+  wrap.append(el("button",{class:"btn danger block",onclick:()=>confirmSheet(
+    "Delete project \""+p.name+"\" and everything in it? This cannot be undone.",deleteProject)},
+    "Delete this project"));
+  return wrap;
+}
+
+/* ============================================================
+   ACTIONS (form wiring)
+   ============================================================ */
+function newProject(){
+  openForm({title:"New project", submitLabel:"Create",
+    fields:[
+      {key:"name",label:"Project name",required:true,placeholder:"e.g. 200 Summer St"},
+      {key:"address",label:"Address",placeholder:"Street, city"},
+      {key:"contactName",label:"End-user contact"},
+      {key:"contactCompany",label:"Company"},
+      {key:"contactPhone",label:"Phone"},
+      {key:"contactEmail",label:"Email"},
+    ],
+    onSubmit:async v=>{ const ref=await addDoc(col("projects"),{...v,createdMs:Date.now(),createdAt:serverTimestamp()});
+      selectProject(ref.id); state.view="network"; toast("Project created"); }});
+}
+function editProject(p){
+  openForm({title:"Edit project", initial:p,
+    fields:[
+      {key:"name",label:"Project name",required:true},
+      {key:"address",label:"Address"},
+      {key:"contactName",label:"End-user contact"},
+      {key:"contactCompany",label:"Company"},
+      {key:"contactPhone",label:"Phone"},
+      {key:"contactEmail",label:"Email"},
+    ],
+    onSubmit:async v=>{ await patch("projects",p.id,v); toast("Saved"); }});
+}
+async function deleteProject(){
+  const pid=state.projectId;
+  for(const name of ["devices","bridges","links","controllers"]){
+    const snap=await getDocs(query(col(name),where("projectId","==",pid)));
+    await Promise.all(snap.docs.map(d=>deleteDoc(d.ref)));
+  }
+  await remove("projects",pid);
+  selectProject(null); state.view="rooms"; toast("Project deleted");
+}
+function openProjects(){
+  const scrim=el("div",{class:"scrim"});
+  const body=el("div",{class:"sheet"}, el("h3",{},"Projects"));
+  if(state.projects.length===0) body.append(el("div",{class:"muted",style:"margin-bottom:12px"},"No projects yet."));
+  for(const p of state.projects){
+    body.append(el("button",{class:"item",onclick:()=>{selectProject(p.id);state.view="rooms";scrim.remove();}},
+      el("div",{class:"grow"}, el("div",{class:"lead"},p.name),
+        el("div",{class:"code",style:"font-family:var(--sans);color:var(--muted)"},p.address||"")),
+      p.id===state.projectId? el("span",{class:"tag done"},"current"):null));
+  }
+  body.append(el("div",{class:"actions"},
+    el("button",{class:"btn ghost",onclick:()=>scrim.remove()},"Close"),
+    el("button",{class:"btn primary",onclick:()=>{scrim.remove();newProject();}},"New project")));
+  scrim.append(body); scrim.addEventListener("click",e=>{if(e.target===scrim)scrim.remove();});
+  document.body.append(scrim);
+}
+
+function editController(c){
+  const isNew=!c;
+  const nextSma=Math.max(0,...state.controllers.filter(x=>x.kind==="SMA").map(x=>x.smaIndex||0))+1;
+  openForm({title:isNew?"Add controller":"Edit controller", initial:c||{kind:"SMA",smaIndex:nextSma},
+    fields:[
+      {key:"kind",label:"Type",type:"select",options:[{value:"SM",label:"Site Manager (NXAC)"},{value:"SMA",label:"Site Manager Adapter"}]},
+      {key:"label",label:"Label / name",required:true,placeholder:"e.g. North wing SMA"},
+      {key:"smaIndex",label:"SMA number (for 2-digit link IDs)",type:"number",placeholder:String(nextSma)},
+      {key:"mac",label:"MAC address"},
+      {key:"ip",label:"IP address"},
+      {key:"location",label:"Physical location"},
+      {key:"bacnet",label:"BACnet info (instance, etc.)"},
+    ],
+    submitLabel:isNew?"Add":"Save",
+    onSubmit:async v=>{ v.smaIndex=v.kind==="SMA"? Number(v.smaIndex||0):0;
+      if(isNew) await add("controllers",v); else await patch("controllers",c.id,v);
+      toast(isNew?"Controller added":"Saved"); }});
+}
+function addLink(){
+  if(state.controllers.length===0){ toast("Add a Site Manager or SMA first"); return; }
+  openForm({title:"Add link",
+    fields:[
+      {key:"controllerId",label:"On which controller",type:"select",
+        options:state.controllers.map(c=>({value:c.id,label:(c.kind==="SM"?"Site Mgr":"SMA "+(c.smaIndex||""))+" — "+c.label}))},
+      {key:"port",label:"Port / link number",type:"number",required:true,placeholder:"0 = direct, else 1-7",
+       help:"Site Manager: use 0 for a direct link, or the switch port 1-7. SMA: the port 1-7."},
+    ],
+    submitLabel:"Add",
+    onSubmit:async v=>{
+      const c=state.controllers.find(x=>x.id===v.controllerId);
+      const port=String(Number(v.port));
+      const displayId = (c && c.kind==="SMA" && c.smaIndex)? String(c.smaIndex)+port : port;
+      if(state.links.find(l=>l.displayId===displayId)){ throw {message:"Link "+displayId+" already exists"}; }
+      await add("links",{controllerId:v.controllerId,port:Number(v.port),displayId});
+      toast("Link "+displayId+" added");
+    }});
+}
+function addBridge(linkId){
+  openForm({title:"Scan a bridge",
+    fields:[
+      {key:"code",label:"Bridge code (8-char)",type:"scan",required:true,placeholder:"scan or type"},
+      {key:"roomName",label:"Room name",required:true,placeholder:"e.g. Conf 204"},
+      {key:"linkId",label:"Link",type:"select",value:linkId,
+        options:state.links.map(l=>({value:l.id,label:"Link "+linkLabel(l)}))},
+    ],
+    submitLabel:"Add room",
+    onSubmit:async v=>{
+      const dup=state.bridges.find(b=>b.code===v.code);
+      if(dup){ throw {message:"Code "+v.code+" already used by room "+(dup.roomName||"?")}; }
+      await add("bridges",{code:v.code,codeRaw:v.codeRaw||v.code,roomName:v.roomName,linkId:v.linkId});
+      toast("Room added");
+    }});
+}
+function editBridge(b){
+  openForm({title:"Edit room", initial:b,
+    fields:[
+      {key:"roomName",label:"Room name",required:true},
+      {key:"code",label:"Bridge code",type:"scan",required:true},
+      {key:"linkId",label:"Link",type:"select",
+        options:state.links.map(l=>({value:l.id,label:"Link "+linkLabel(l)}))},
+    ],
+    onSubmit:async v=>{ await patch("bridges",b.id,{roomName:v.roomName,code:v.code,linkId:v.linkId}); toast("Saved"); }});
+}
+function addDevice(bridgeId){
+  openForm({title:"Scan a device",
+    fields:[
+      {key:"code",label:"Device code (8-char)",type:"scan",required:true,placeholder:"scan or type"},
+      {key:"type",label:"Device type",type:"select",options:DEVICE_TYPES.map(t=>({value:t,label:t}))},
+      {key:"zone",label:"Zone",placeholder:"e.g. 1, A, North"},
+    ],
+    submitLabel:"Add device",
+    onSubmit:async v=>{
+      const dup=state.devices.find(d=>d.code===v.code);
+      if(dup){ throw {message:"Code "+v.code+" already scanned ("+dup.type+")"}; }
+      await add("devices",{code:v.code,codeRaw:v.codeRaw||v.code,type:v.type,zone:v.zone,bridgeId});
+      toast("Device added");
+    }});
+}
+function editExpected(){
+  const exp=(curProject()&&curProject().expected)||{};
+  openForm({title:"Expected totals",
+    fields:COUNTABLE.map(k=>({key:k,label:k,type:"number",value:exp[k]||""})),
+    onSubmit:async v=>{ const obj={}; for(const k of COUNTABLE){ const n=Number(v[k]); if(n>0) obj[k]=n; }
+      await patch("projects",state.projectId,{expected:obj}); toast("Saved"); }});
+}
+
+/* ---- CSV export ---- */
+function csvCell(s){ s=(s==null?"":String(s)); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }
+function exportCsv(){
+  const p=curProject();
+  const head=["Project","Address","Controller","Controller IP","Controller MAC","Link","Room","Bridge code","Device type","Zone","Device code","Raw scan","Scanned"];
+  const rows=[head];
+  const findLink=id=>state.links.find(l=>l.id===id);
+  const findCtrl=id=>state.controllers.find(c=>c.id===id);
+  const stamp=ms=>ms? new Date(ms).toISOString() : "";
+  for(const b of state.bridges){
+    const link=findLink(b.linkId); const ctrl=link?findCtrl(link.controllerId):null;
+    const base=[p.name,p.address, ctrl?((ctrl.kind==="SM"?"Site Mgr":"SMA "+(ctrl.smaIndex||""))+" "+ctrl.label):"",
+      ctrl?ctrl.ip:"", ctrl?ctrl.mac:"", link?link.displayId:"", b.roomName, b.code];
+    const ds=devicesForBridge(b.id);
+    if(ds.length===0){ rows.push([...base,"","","","",stamp(b.createdMs)]); }
+    for(const d of ds){ rows.push([...base,d.type,d.zone,d.code,d.codeRaw||d.code,stamp(d.createdMs)]); }
+  }
+  const csv=rows.map(r=>r.map(csvCell).join(",")).join("\r\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=el("a",{href:url,download:(p.name||"project").replace(/[^a-z0-9]+/gi,"_")+"_devices.csv"});
+  document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  toast("CSV downloaded");
+}
+
+/* ---- nav wiring ---- */
+document.querySelectorAll("nav.tabs button").forEach(b=>
+  b.addEventListener("click",()=>{ state.view=b.dataset.view; if(state.view==="rooms") state.activeBridgeId=null; render(); }));
+$("#btnProjects").addEventListener("click",openProjects);
+
+</script>
+
+<!-- =========================================================================
+     EDIT THIS: paste your Firebase web config here, then reload.
+     ========================================================================= -->
+<script>
+  window.__NX_FIREBASE_CONFIG__ = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+</script>
+</body>
+</html>
