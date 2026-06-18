@@ -3,18 +3,20 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#14202b" />
-<title>NX Device Tracker</title>
+<meta name="theme-color" content="#1a2332" />
+<title>relay-race · Control Tech</title>
 <style>
   :root{
-    --bg:#eef1f4; --surface:#ffffff; --ink:#14202b; --muted:#5b6b7a; --faint:#8493a0;
-    --line:#d8dee4; --line2:#e7ebee;
-    --accent:#1c5fd7; --accent-ink:#ffffff;
-    --pending:#f0a000; --done:#1f9d57; --idle:#9aa7b2;
+    --bg:#f0f2f0; --surface:#ffffff; --ink:#1a2332; --muted:#5a6a5a; --faint:#8a9a8a;
+    --line:#d4dbd4; --line2:#e8ede8;
+    --accent:#84BD00; --accent-ink:#ffffff;
+    --accent-dark:#6a9800; --accent-pale:#edf5d6;
+    --pending:#e07b00; --done:#84BD00; --idle:#9aaa9a;
     --danger:#d23b3b;
     --radius:12px; --tap:48px;
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --header:#1a2332;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -29,14 +31,19 @@
   #app{max-width:680px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
        background:var(--bg); padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   header.bar{
-    position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;
+    position:sticky;top:0;z-index:30;background:var(--header);color:#fff;
     padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;display:flex;align-items:center;gap:10px;
   }
+  header.bar .logo{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);flex-shrink:0;line-height:1.2}
+  header.bar .logo span{display:block;font-size:8px;letter-spacing:.06em;color:rgba(255,255,255,.4);font-weight:600}
+  header.bar .divider{width:1px;height:26px;background:rgba(255,255,255,.15);flex-shrink:0}
   header.bar .proj{flex:1;min-width:0}
-  header.bar .proj .name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  header.bar .proj .sub{font-size:12px;color:#a9b6c2}
-  header.bar button.switch{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:8px;
-       height:38px;padding:0 12px;font-size:13px;font-weight:600}
+  header.bar .proj .name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.bar .proj .sub{font-size:11px;color:#a9b6c2}
+  header.bar button.switch{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.18);
+       border-radius:8px;height:36px;padding:0 12px;font-size:13px;font-weight:600}
+  header.bar button.switch:active{background:rgba(255,255,255,.2)}
   .net{font-size:11px;display:inline-flex;align-items:center;gap:5px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--done)}
   .dot.off{background:var(--pending)}
@@ -55,18 +62,19 @@
   .item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);
       border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;margin-bottom:9px;
       min-height:var(--tap);font-size:15px;color:var(--ink);cursor:pointer}
-  .item:active{background:#f3f6f9}
+  .item:active{background:#f2f6ea}
   .item .lead{font-weight:600}
   .item .code{font-family:var(--mono);font-size:13px;color:var(--muted)}
   .item .chev{color:var(--faint);font-size:20px;margin-left:auto}
   .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
-  .tag.done{background:#e3f5ec;color:var(--done)} .tag.pending{background:#fdf0d6;color:#a9760a}
-  .tag.zone{background:#e9eefb;color:var(--accent)}
+  .tag.done{background:var(--accent-pale);color:var(--accent-dark)} .tag.pending{background:#fdf0d6;color:#a9760a}
+  .tag.zone{background:#eef5d6;color:var(--accent-dark)}
 
   /* buttons */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;
       border-radius:10px;height:var(--tap);padding:0 16px;font-size:15px;font-weight:600}
   .btn.primary{background:var(--accent);color:var(--accent-ink);width:100%}
+  .btn.primary:active{background:var(--accent-dark)}
   .btn.ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
   .btn.sm{height:38px;font-size:13px;padding:0 12px}
   .btn.block{width:100%}
@@ -122,7 +130,7 @@
   .meter > i{display:block;height:100%;background:var(--done);border-radius:999px}
   .meter > i.part{background:var(--pending)}
   .pathline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
-  .pathline .seg{background:#eef2f7;border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+  .pathline .seg{background:var(--accent-pale);border:1px solid #cde09a;border-radius:8px;padding:5px 9px}
   .pathline .seg b{font-family:var(--mono)}
   .pathline .arr{color:var(--faint)}
 
@@ -144,6 +152,8 @@
 <body>
 <div id="app">
   <header class="bar">
+    <div class="logo">relay-race<span>by Control Tech</span></div>
+    <div class="divider"></div>
     <div class="proj" id="projHead">
       <div class="name" id="projName">No project</div>
       <div class="sub"><span class="net" id="netState"><span class="dot" id="netDot"></span><span id="netTxt">connecting…</span></span></div>
@@ -289,7 +299,12 @@ function selectProject(pid){
     }));
   };
   watch("controllers","controllers",(a,b)=>(a.smaIndex||0)-(b.smaIndex||0));
-  watch("links","links",(a,b)=>(a.displayId||"").localeCompare(b.displayId||"",undefined,{numeric:true}));
+  watch("links","links",(a,b)=>{
+    const ca=state.controllers.find(c=>c.id===a.controllerId), cb=state.controllers.find(c=>c.id===b.controllerId);
+    const sa=(ca?ca.smaIndex||0:0)*1000+(a.switchNum||0)*10+(a.port||0);
+    const sb=(cb?cb.smaIndex||0:0)*1000+(b.switchNum||0)*10+(b.port||0);
+    return sa-sb;
+  });
   watch("bridges","bridges",(a,b)=>(a.roomName||"").localeCompare(b.roomName||""));
   watch("devices","devices",(a,b)=>(a.createdMs||0)-(b.createdMs||0));
   render();
@@ -304,8 +319,18 @@ const linksForView = ()=>state.links;
 const bridgesOnLink = (lid)=>state.bridges.filter(b=>b.linkId===lid);
 const devicesForBridge = (bid)=>state.devices.filter(d=>d.bridgeId===bid);
 function linkLabel(l){
-  const c=state.controllers.find(c=>c.id===l.controllerId);
-  return (l.displayId||"?") + (c? " · "+c.label : "");
+  const c=state.controllers.find(x=>x.id===l.controllerId);
+  const ctrlPart = c ? (c.kind==="SM" ? "Site Manager" : "SMA "+(c.smaIndex||""))+" — "+c.label : "Unknown controller";
+  const swPart = (l.switchNum||0)===0 ? "Direct connection" : "Switch "+(l.switchNum);
+  const portPart = "Port "+(l.port||"?");
+  return ctrlPart+" · "+swPart+" · "+portPart;
+}
+function linkShort(l){
+  // Short label for dropdowns where space is tight
+  const c=state.controllers.find(x=>x.id===l.controllerId);
+  const ctrlPart = c ? (c.kind==="SM" ? "SM" : "SMA"+(c.smaIndex||"")) : "?";
+  const swPart = (l.switchNum||0)===0 ? "Direct" : "Sw"+(l.switchNum);
+  return ctrlPart+" · "+swPart+" · Port "+(l.port||"?");
 }
 
 /* ============================================================
@@ -486,7 +511,7 @@ function viewRooms(){
   }
   if(!state.activeLinkId || !links.find(l=>l.id===state.activeLinkId)) state.activeLinkId=links[0].id;
   const sel=el("select",{onchange:e=>{state.activeLinkId=e.target.value;render();}});
-  for(const l of links){ const o=el("option",{value:l.id},"Link "+linkLabel(l));
+  for(const l of links){ const o=el("option",{value:l.id},linkShort(l));
     if(l.id===state.activeLinkId) o.selected=true; sel.append(o); }
   wrap.append(el("div",{class:"linkbar"}, el("span",{class:"muted",style:"font-size:13px"},"Viewing"), sel));
 
@@ -524,7 +549,7 @@ function viewBridge(){
       el("div",{class:"grow"},
         el("div",{style:"font-weight:700;font-size:18px"},b.roomName||"(unnamed room)"),
         el("div",{class:"code",style:"color:var(--muted);margin-top:3px"},
-          "Bridge "+b.code+(link?"  ·  Link "+linkLabel(link):""))),
+          "Bridge "+b.code+(link?"  ·  "+linkLabel(link):""))),
       el("button",{class:"btn ghost sm",onclick:()=>editBridge(b)},"Edit"))));
   wrap.append(el("h2",{class:"view-title"},"Devices in this room"));
   const ds=devicesForBridge(b.id);
@@ -587,8 +612,8 @@ function renderLookupResults(container){
     const ctrl=link? state.controllers.find(c=>c.id===link.controllerId):null;
     const path=el("div",{class:"pathline"});
     const seg=(t,code)=>el("span",{class:"seg"}, code? [t+" ", el("b",{},code)] : t);
-    if(ctrl){ path.append(seg(ctrl.kind==="SM"?"Site Mgr":"SMA",ctrl.label)); path.append(el("span",{class:"arr"},"›")); }
-    if(link){ path.append(seg("Link",link.displayId)); path.append(el("span",{class:"arr"},"›")); }
+    if(ctrl){ path.append(seg(ctrl.kind==="SM"?"Site Manager":"SMA "+(ctrl.smaIndex||""),ctrl.label)); path.append(el("span",{class:"arr"},"›")); }
+    if(link){ path.append(seg(linkShort(link))); path.append(el("span",{class:"arr"},"›")); }
     if(b){ path.append(seg(b.roomName||"room")); }
     container.append(el("div",{class:"card"},
       el("div",{class:"row",style:"margin-bottom:10px"},
@@ -632,13 +657,19 @@ function viewNetwork(){
   }
   for(const l of state.links){
     const n=bridgesOnLink(l.id).length;
-    wrap.append(el("div",{class:"item"},
-      el("div",{class:"grow"},
-        el("div",{class:"lead"},"Link "+l.displayId),
-        el("div",{class:"code"},linkLabel(l))),
-      el("span",{class:"tag "+(n>0?"done":"pending")}, n+" bridge"+(n===1?"":"s")),
-      el("button",{class:"btn ghost sm",onclick:()=>confirmSheet(
-        "Delete Link "+l.displayId+"? Bridges on it will be left unlinked.",()=>remove("links",l.id))},"✕")));
+    const c=state.controllers.find(x=>x.id===l.controllerId);
+    const ctrlName=c?(c.kind==="SM"?"Site Manager":"SMA "+(c.smaIndex||""))+" — "+c.label:"Unknown";
+    const swLine=(l.switchNum||0)===0?"Direct connection":"Switch "+(l.switchNum);
+    wrap.append(el("div",{class:"card",style:"margin-bottom:9px"},
+      el("div",{class:"row"},
+        el("div",{class:"grow"},
+          el("div",{style:"font-weight:600;font-size:15px"},"Port "+(l.port||"?")),
+          el("div",{class:"muted",style:"font-size:13px;margin-top:2px"},ctrlName),
+          el("div",{class:"muted",style:"font-size:13px"},swLine)),
+        el("span",{class:"tag "+(n>0?"done":"pending"),style:"margin-right:8px"}, n+" bridge"+(n===1?"":"s")),
+        el("button",{class:"btn ghost sm",onclick:()=>confirmSheet(
+          "Delete this link ("+linkShort(l)+")? Bridges on it will be left unlinked.",
+          ()=>remove("links",l.id))},"✕"))));
   }
   wrap.append(el("button",{class:"btn ghost block",onclick:addLink,
     disabled: state.controllers.length===0? "":null},"＋  Add link"));
@@ -776,21 +807,28 @@ function editController(c){
 }
 function addLink(){
   if(state.controllers.length===0){ toast("Add a Site Manager or SMA first"); return; }
+  // Build switch options: 0 = direct, 1-8 = network switches in chain
+  const switchOpts=[{value:"0",label:"0 — Direct connection (no switch)"}];
+  for(let i=1;i<=8;i++) switchOpts.push({value:String(i),label:String(i)+" — Network switch "+i});
+  const portOpts=[];
+  for(let i=1;i<=7;i++) portOpts.push({value:String(i),label:"Port "+i});
+
   openForm({title:"Add link",
     fields:[
-      {key:"controllerId",label:"On which controller",type:"select",
-        options:state.controllers.map(c=>({value:c.id,label:(c.kind==="SM"?"Site Mgr":"SMA "+(c.smaIndex||""))+" — "+c.label}))},
-      {key:"port",label:"Port / link number",type:"number",required:true,placeholder:"0 = direct, else 1-7",
-       help:"Site Manager: use 0 for a direct link, or the switch port 1-7. SMA: the port 1-7."},
+      {key:"controllerId",label:"Controller",type:"select",
+        options:state.controllers.map(c=>({value:c.id,label:(c.kind==="SM"?"Site Manager":"SMA "+(c.smaIndex||""))+" — "+c.label}))},
+      {key:"switchNum",label:"Network switch",type:"select",options:switchOpts,
+        help:"Choose 0 if the bridge link plugs directly into the controller. Otherwise choose which switch in the daisy chain."},
+      {key:"port",label:"Port number",type:"select",options:portOpts},
     ],
-    submitLabel:"Add",
+    submitLabel:"Add link",
     onSubmit:async v=>{
-      const c=state.controllers.find(x=>x.id===v.controllerId);
-      const port=String(Number(v.port));
-      const displayId = (c && c.kind==="SMA" && c.smaIndex)? String(c.smaIndex)+port : port;
-      if(state.links.find(l=>l.displayId===displayId)){ throw {message:"Link "+displayId+" already exists"}; }
-      await add("links",{controllerId:v.controllerId,port:Number(v.port),displayId});
-      toast("Link "+displayId+" added");
+      const switchNum=Number(v.switchNum); const port=Number(v.port);
+      const dup=state.links.find(l=>l.controllerId===v.controllerId && (l.switchNum||0)===switchNum && (l.port||0)===port);
+      if(dup){ throw {message:"A link already exists for that controller / switch / port combination"}; }
+      await add("links",{controllerId:v.controllerId,switchNum,port});
+      const label=linkLabel({controllerId:v.controllerId,switchNum,port});
+      toast("Link added: "+label);
     }});
 }
 function addBridge(linkId){
@@ -799,7 +837,7 @@ function addBridge(linkId){
       {key:"code",label:"Bridge code (8-char)",type:"scan",required:true,placeholder:"scan or type"},
       {key:"roomName",label:"Room name",required:true,placeholder:"e.g. Conf 204"},
       {key:"linkId",label:"Link",type:"select",value:linkId,
-        options:state.links.map(l=>({value:l.id,label:"Link "+linkLabel(l)}))},
+        options:state.links.map(l=>({value:l.id,label:linkShort(l)}))},
     ],
     submitLabel:"Add room",
     onSubmit:async v=>{
@@ -815,7 +853,7 @@ function editBridge(b){
       {key:"roomName",label:"Room name",required:true},
       {key:"code",label:"Bridge code",type:"scan",required:true},
       {key:"linkId",label:"Link",type:"select",
-        options:state.links.map(l=>({value:l.id,label:"Link "+linkLabel(l)}))},
+        options:state.links.map(l=>({value:l.id,label:linkShort(l)}))},
     ],
     onSubmit:async v=>{ await patch("bridges",b.id,{roomName:v.roomName,code:v.code,linkId:v.linkId}); toast("Saved"); }});
 }
@@ -846,15 +884,18 @@ function editExpected(){
 function csvCell(s){ s=(s==null?"":String(s)); return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }
 function exportCsv(){
   const p=curProject();
-  const head=["Project","Address","Controller","Controller IP","Controller MAC","Link","Room","Bridge code","Device type","Zone","Device code","Raw scan","Scanned"];
+  const head=["Project","Address","Controller","Controller IP","Controller MAC","Switch","Port","Room","Bridge code","Device type","Zone","Device code","Raw scan","Scanned"];
   const rows=[head];
   const findLink=id=>state.links.find(l=>l.id===id);
   const findCtrl=id=>state.controllers.find(c=>c.id===id);
   const stamp=ms=>ms? new Date(ms).toISOString() : "";
   for(const b of state.bridges){
     const link=findLink(b.linkId); const ctrl=link?findCtrl(link.controllerId):null;
-    const base=[p.name,p.address, ctrl?((ctrl.kind==="SM"?"Site Mgr":"SMA "+(ctrl.smaIndex||""))+" "+ctrl.label):"",
-      ctrl?ctrl.ip:"", ctrl?ctrl.mac:"", link?link.displayId:"", b.roomName, b.code];
+    const base=[p.name,p.address, ctrl?((ctrl.kind==="SM"?"Site Manager":"SMA "+(ctrl.smaIndex||""))+" — "+ctrl.label):"",
+      ctrl?ctrl.ip:"", ctrl?ctrl.mac:"",
+      link?((link.switchNum||0)===0?"Direct":"Switch "+(link.switchNum)):"",
+      link?"Port "+(link.port||"?"):"",
+      b.roomName, b.code];
     const ds=devicesForBridge(b.id);
     if(ds.length===0){ rows.push([...base,"","","","",stamp(b.createdMs)]); }
     for(const d of ds){ rows.push([...base,d.type,d.zone,d.code,d.codeRaw||d.code,stamp(d.createdMs)]); }
