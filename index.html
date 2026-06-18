@@ -3,18 +3,20 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#14202b" />
-<title>NX Device Tracker</title>
+<meta name="theme-color" content="#1a2332" />
+<title>relay-race · Control Tech</title>
 <style>
   :root{
-    --bg:#eef1f4; --surface:#ffffff; --ink:#14202b; --muted:#5b6b7a; --faint:#8493a0;
-    --line:#d8dee4; --line2:#e7ebee;
-    --accent:#1c5fd7; --accent-ink:#ffffff;
-    --pending:#f0a000; --done:#1f9d57; --idle:#9aa7b2;
+    --bg:#f0f2f0; --surface:#ffffff; --ink:#1a2332; --muted:#5a6a5a; --faint:#8a9a8a;
+    --line:#d4dbd4; --line2:#e8ede8;
+    --accent:#84BD00; --accent-ink:#ffffff;
+    --accent-dark:#6a9800; --accent-pale:#edf5d6;
+    --pending:#e07b00; --done:#84BD00; --idle:#9aaa9a;
     --danger:#d23b3b;
     --radius:12px; --tap:48px;
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --header:#1a2332;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -29,14 +31,19 @@
   #app{max-width:680px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
        background:var(--bg); padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   header.bar{
-    position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;
+    position:sticky;top:0;z-index:30;background:var(--header);color:#fff;
     padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;display:flex;align-items:center;gap:10px;
   }
+  header.bar .logo{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);flex-shrink:0;line-height:1.2}
+  header.bar .logo span{display:block;font-size:8px;letter-spacing:.06em;color:rgba(255,255,255,.4);font-weight:600}
+  header.bar .divider{width:1px;height:26px;background:rgba(255,255,255,.15);flex-shrink:0}
   header.bar .proj{flex:1;min-width:0}
-  header.bar .proj .name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  header.bar .proj .sub{font-size:12px;color:#a9b6c2}
-  header.bar button.switch{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:8px;
-       height:38px;padding:0 12px;font-size:13px;font-weight:600}
+  header.bar .proj .name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.bar .proj .sub{font-size:11px;color:#a9b6c2}
+  header.bar button.switch{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.18);
+       border-radius:8px;height:36px;padding:0 12px;font-size:13px;font-weight:600}
+  header.bar button.switch:active{background:rgba(255,255,255,.2)}
   .net{font-size:11px;display:inline-flex;align-items:center;gap:5px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--done)}
   .dot.off{background:var(--pending)}
@@ -55,18 +62,19 @@
   .item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);
       border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;margin-bottom:9px;
       min-height:var(--tap);font-size:15px;color:var(--ink);cursor:pointer}
-  .item:active{background:#f3f6f9}
+  .item:active{background:#f2f6ea}
   .item .lead{font-weight:600}
   .item .code{font-family:var(--mono);font-size:13px;color:var(--muted)}
   .item .chev{color:var(--faint);font-size:20px;margin-left:auto}
   .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
-  .tag.done{background:#e3f5ec;color:var(--done)} .tag.pending{background:#fdf0d6;color:#a9760a}
-  .tag.zone{background:#e9eefb;color:var(--accent)}
+  .tag.done{background:var(--accent-pale);color:var(--accent-dark)} .tag.pending{background:#fdf0d6;color:#a9760a}
+  .tag.zone{background:#eef5d6;color:var(--accent-dark)}
 
   /* buttons */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;
       border-radius:10px;height:var(--tap);padding:0 16px;font-size:15px;font-weight:600}
   .btn.primary{background:var(--accent);color:var(--accent-ink);width:100%}
+  .btn.primary:active{background:var(--accent-dark)}
   .btn.ghost{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
   .btn.sm{height:38px;font-size:13px;padding:0 12px}
   .btn.block{width:100%}
@@ -122,7 +130,7 @@
   .meter > i{display:block;height:100%;background:var(--done);border-radius:999px}
   .meter > i.part{background:var(--pending)}
   .pathline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
-  .pathline .seg{background:#eef2f7;border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+  .pathline .seg{background:var(--accent-pale);border:1px solid #cde09a;border-radius:8px;padding:5px 9px}
   .pathline .seg b{font-family:var(--mono)}
   .pathline .arr{color:var(--faint)}
 
@@ -144,6 +152,8 @@
 <body>
 <div id="app">
   <header class="bar">
+    <div class="logo">relay-race<span>by Control Tech</span></div>
+    <div class="divider"></div>
     <div class="proj" id="projHead">
       <div class="name" id="projName">No project</div>
       <div class="sub"><span class="net" id="netState"><span class="dot" id="netDot"></span><span id="netTxt">connecting…</span></span></div>
@@ -874,14 +884,25 @@ $("#btnProjects").addEventListener("click",openProjects);
 
 </script>
 
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDBzCjIa7zxweeMXFVwVgpm-GrismRcCvg",
+  authDomain: "ctech-relay-race.firebaseapp.com",
+  projectId: "ctech-relay-race",
+  storageBucket: "ctech-relay-race.firebasestorage.app",
+  messagingSenderId: "522211276476",
+  appId: "1:522211276476:web:6ef6479d98b4e9694842b9",
+  measurementId: "G-P66192Q71W"
+};
+
 <script>
   window.__NX_FIREBASE_CONFIG__ = {
-    apiKey: "AIzaSyDBzCjIa7zxweeMXFVwVgpm-GrismRcCvg",
-    authDomain: "ctech-relay-race.firebaseapp.com",
-    projectId: "ctech-relay-race",
-    storageBucket: "ctech-relay-race.firebasestorage.app",
-    messagingSenderId: "522211276476",
-    appId: "1:522211276476:web:6ef6479d98b4e9694842b9"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
   };
 </script>
 </body>
